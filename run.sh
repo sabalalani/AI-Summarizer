@@ -1,4 +1,1 @@
-FLASK_APP=app.py
-FLASK_RUN_HOST=0.0.0.0
-FLASK_RUN_PORT=7860
-flask run
+gunicorn app:app --bind 0.0.0.0:7860
