@@ -7,10 +7,10 @@ from flask_cors import CORS
 
 app = Flask(__name__, template_folder='.')
 CORS(app)
-# Explicitly setting to 'cpu' to avoid VRAM issues with large models (now removed)
+# Explicitly setting to 'cpu' to avoid VRAM issues
 device = 'cpu'
 
-# --- Define and Pre-load Available Models (BART-Large REMOVED) ---
+# --- Define Available Models ---
 AVAILABLE_MODELS = {
     "DistilBART (Fast)": {
         "path": "sshleifer/distilbart-cnn-12-6",
@@ -22,11 +22,29 @@ AVAILABLE_MODELS = {
         "model_class": T5ForConditionalGeneration,
         "tokenizer_class": T5Tokenizer,
     },
-    # BART-Large (High Quality) model removed for stability
 }
 
 # Dictionary to hold loaded model/tokenizer objects
 LOADED_PIPELINES = {}
+
+# *** NEW: Pre-load the smallest model (T5-Small) for quick startup ***
+try:
+    T5_MODEL_INFO = AVAILABLE_MODELS["T5-Small (Fastest)"]
+    # 1. Load tokenizer
+    T5_TOKENIZER = T5_MODEL_INFO["tokenizer_class"].from_pretrained(T5_MODEL_INFO["path"])
+    # 2. Load model
+    T5_MODEL = T5_MODEL_INFO["model_class"].from_pretrained(T5_MODEL_INFO["path"])
+    T5_MODEL.to(device)
+
+    LOADED_PIPELINES["T5-Small (Fastest)"] = {"model": T5_MODEL, "tokenizer": T5_TOKENIZER}
+
+    print("Pre-loaded T5-Small (Fastest) successfully for quick startup.")
+except Exception as e:
+    # If this fails, the app will still proceed, relying purely on lazy loading.
+    print(f"Failed to pre-load T5-Small: {e}. Relying entirely on lazy loading.")
+
+
+# *******************************************************************
 
 
 def get_summarization_pipeline(model_name):
@@ -79,6 +97,7 @@ def summarize_text():
     try:
         model, tokenizer = get_summarization_pipeline(selected_model_name)
 
+        # T5 models require a task prefix!
         if "T5" in selected_model_name:
             input_text = "summarize: " + input_text
 
