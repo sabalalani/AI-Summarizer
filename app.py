@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 import torch
@@ -57,6 +58,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount templates directory
+app.mount("/templates", StaticFiles(directory="templates"), name="templates")
+
 
 class SummarizeRequest(BaseModel):
     text: str
@@ -71,8 +75,8 @@ class SummarizeResponse(BaseModel):
 
 @app.get("/")
 async def serve_frontend():
-    """Serve the frontend HTML"""
-    return FileResponse('index.html')
+    """Serve the frontend HTML from templates directory"""
+    return FileResponse('templates/index.html')
 
 
 @app.get("/health")
@@ -122,9 +126,6 @@ async def summarize_text(request: SummarizeRequest):
         logger.error(f"Summarization error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# Mount static files if you have any
-app.mount("/static", StaticFiles(directory="templates"), name="static")
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=7860)
