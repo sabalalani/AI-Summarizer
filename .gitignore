@@ -1,0 +1,16 @@
+# .gitignore
+# Ignore the virtual environment
+.venv/
+venv/
+env/
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore operating system files
+.DS_Store
+
+# Hugging Face cache (can be very large)
+/cache/

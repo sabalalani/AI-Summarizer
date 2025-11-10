@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Text Summarizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .summary-container {
+            border-left: 5px solid #007bff;
+            padding: 15px;
+            background-color: #f8f9fa;
+        }
+        .loading-spinner {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <header class="text-center mb-4">
+            <h1 class="display-4 text-primary">🧠 Open Source AI Summarizer</h1>
+            <p class="lead">Condense long articles into key takeaways using a custom Hugging Face model.</p>
+        </header>
+
+        <div class="row">
+            <div class="col-md-7 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Input Text</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea id="text-input" class="form-control" rows="15" placeholder="Paste your article, document, or long text here..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Summary Options</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="model-select" class="form-label">Select Model:</label>
+                            <select class="form-select" id="model-select">
+                                <option value="DistilBART (Fast)" selected>DistilBART (Fast)</option>
+                                <option value="T5-Small (Fastest)">T5-Small (Fastest)</option>
+                            </select>
+                            <small class="text-muted">High Quality models are slower and use more memory.</small>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <label for="min-length" class="form-label">Min Summary Length (Words): <span id="min-len-display">30</span></label>
+                            <input type="range" class="form-range" id="min-length" min="10" max="100" value="30">
+                        </div>
+                        <div class="mb-3">
+                            <label for="max-length" class="form-label">Max Summary Length (Words): <span id="max-len-display">150</span></label>
+                            <input type="range" class="form-range" id="max-length" min="50" max="500" value="150">
+                        </div>
+
+                        <button class="btn btn-primary w-100" id="summarize-btn" onclick="summarize()">
+                            <span class="spinner-border spinner-border-sm loading-spinner me-2" role="status" aria-hidden="true"></span>
+                            Summarize Text
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Summary Output</h5>
+                    </div>
+                    <div class="card-body">
+                        <p id="summary-output">The generated summary will appear here.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000/summarize';
+
+        // Update range displays dynamically
+        document.getElementById('min-length').addEventListener('input', (e) => {
+            document.getElementById('min-len-display').textContent = e.target.value;
+        });
+        document.getElementById('max-length').addEventListener('input', (e) => {
+            document.getElementById('max-len-display').textContent = e.target.value;
+        });
+
+        async function summarize() {
+        const inputText = document.getElementById('text-input').value;
+        const minLength = document.getElementById('min-length').value;
+        const maxLength = document.getElementById('max-length').value;
+        // *** NEW: Capture model selection ***
+        const modelName = document.getElementById('model-select').value;
+        // ************************************
+
+        const outputDiv = document.getElementById('summary-output');
+        const summarizeBtn = document.getElementById('summarize-btn');
+        const loadingSpinner = document.querySelector('.loading-spinner');
+
+        if (inputText.trim() === "") {
+            outputDiv.textContent = "Please enter some text to summarize.";
+            return;
+        }
+        if (parseInt(minLength) >= parseInt(maxLength)) {
+            outputDiv.textContent = "Error: Minimum length must be less than Maximum length.";
+            return;
+        }
+
+        // 1. **Show Loading State**
+        summarizeBtn.disabled = true;
+        loadingSpinner.style.display = 'inline-block';
+        outputDiv.textContent = `Generating summary using ${modelName}, please wait... (First load may take a minute)`;
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: inputText,
+                    min_length: parseInt(minLength),
+                    max_length: parseInt(maxLength),
+                    model_name: modelName // *** NEW: Send model name ***
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.summary) {
+                outputDiv.textContent = data.summary;
+            } else if (data.error) {
+                outputDiv.textContent = `Error: ${data.error}`;
+            }
+
+        } catch (error) {
+            console.error('Fetch error:', error);
+            outputDiv.textContent = "A connection error occurred. Is the Python backend running?";
+        } finally {
+            // 2. **Hide Loading State**
+            summarizeBtn.disabled = false;
+            loadingSpinner.style.display = 'none';
+        }
+    }
+    </script>
+</body>
+</html>
