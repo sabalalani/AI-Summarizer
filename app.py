@@ -1,5 +1,3 @@
-# app.py
-
 from flask import Flask, request, jsonify, render_template
 from transformers import BartForConditionalGeneration, BartTokenizer, T5ForConditionalGeneration, T5Tokenizer
 import torch
@@ -24,15 +22,13 @@ AVAILABLE_MODELS = {
     },
 }
 
-# Dictionary to hold loaded model/tokenizer objects
+# Dictionary to hold loaded model/tokenizer objects (caching)
 LOADED_PIPELINES = {}
 
-# *** NEW: Pre-load the smallest model (T5-Small) for quick startup ***
+# *** Pre-load the smallest model (T5-Small) for quick startup ***
 try:
     T5_MODEL_INFO = AVAILABLE_MODELS["T5-Small (Fastest)"]
-    # 1. Load tokenizer
     T5_TOKENIZER = T5_MODEL_INFO["tokenizer_class"].from_pretrained(T5_MODEL_INFO["path"])
-    # 2. Load model
     T5_MODEL = T5_MODEL_INFO["model_class"].from_pretrained(T5_MODEL_INFO["path"])
     T5_MODEL.to(device)
 
@@ -40,24 +36,17 @@ try:
 
     print("Pre-loaded T5-Small (Fastest) successfully for quick startup.")
 except Exception as e:
-    # If this fails, the app will still proceed, relying purely on lazy loading.
     print(f"Failed to pre-load T5-Small: {e}. Relying entirely on lazy loading.")
 
 
-# *******************************************************************
-
-
 def get_summarization_pipeline(model_name):
-    """Loads a model and tokenizer if not already in memory."""
+    """Dynamically loads a model/tokenizer if not already in the cache."""
     if model_name in LOADED_PIPELINES:
         return LOADED_PIPELINES[model_name]["model"], LOADED_PIPELINES[model_name]["tokenizer"]
 
+    # If the requested model is not in the cache and not in AVAILABLE_MODELS, raise error
     if model_name not in AVAILABLE_MODELS:
-        # Fallback to a default if the removed model is somehow requested
-        if model_name == 'BART-Large (High Quality)':
-            model_name = "DistilBART (Fast)"
-        else:
-            raise ValueError(f"Model '{model_name}' not recognized.")
+        raise ValueError(f"Model '{model_name}' not recognized or available.")
 
     model_info = AVAILABLE_MODELS[model_name]
 
@@ -78,6 +67,7 @@ def get_summarization_pipeline(model_name):
 
 @app.route('/')
 def serve_frontend():
+    """Serves the main HTML page."""
     return render_template('index.html')
 
 
@@ -88,8 +78,8 @@ def summarize_text():
     min_length = data.get('min_length', 30)
     max_length = data.get('max_length', 150)
 
-    # Defaulting to the stable DistilBART if an invalid model name comes through
-    selected_model_name = data.get('model_name', 'DistilBART (Fast)')
+    # Defaulting to a safe, pre-loaded model if the frontend sends a bad value
+    selected_model_name = data.get('model_name', 'T5-Small (Fastest)')
 
     if not input_text:
         return jsonify({"error": "No text provided"}), 400
