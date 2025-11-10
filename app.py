@@ -1,29 +1,39 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import logging
 import uvicorn
+import os
 
 # Initialize FastAPI app
-app = FastAPI(title="T5 Text Generation API")
+app = FastAPI(title="AI Text Summarizer")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Global variables for model and tokenizer
 model = None
 tokenizer = None
 
 
-class TextRequest(BaseModel):
+class SummarizeRequest(BaseModel):
     text: str
+    min_length: int = 30
+    max_length: int = 150
+    model_name: str = "T5-Small (Fastest)"
 
 
-class TextResponse(BaseModel):
-    input: str
-    generated_text: str
+class SummarizeResponse(BaseModel):
+    summary: str
 
 
 @app.on_event("startup")
@@ -42,24 +52,19 @@ async def load_model():
 
 
 @app.get("/")
-async def home():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "message": "T5 Model API is running",
-        "model_loaded": model is not None
-    }
+async def serve_frontend():
+    """Serve the frontend HTML"""
+    return FileResponse('index.html')
 
 
 @app.get("/health")
 async def health():
-    """Health check for Hugging Face"""
     return {"status": "healthy"}
 
 
-@app.post("/generate", response_model=TextResponse)
-async def generate_text(request: TextRequest):
-    """Generate text using T5 model"""
+@app.post("/summarize", response_model=SummarizeResponse)
+async def summarize_text(request: SummarizeRequest):
+    """Summarize text using T5 model"""
     try:
         if model is None or tokenizer is None:
             raise HTTPException(status_code=503, detail="Model not loaded")
@@ -69,33 +74,39 @@ async def generate_text(request: TextRequest):
         if not input_text:
             raise HTTPException(status_code=400, detail="No text provided")
 
-        # Preprocess input for T5
-        input_text = "summarize: " + input_text  # Example task prefix
+        # Preprocess input for T5 - add "summarize:" prefix
+        input_text = "summarize: " + input_text
 
-        # Tokenize and generate
-        inputs = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True)
+        # Tokenize
+        inputs = tokenizer.encode(
+            input_text,
+            return_tensors="pt",
+            max_length=512,
+            truncation=True
+        )
 
+        # Generate summary
         with torch.no_grad():
             outputs = model.generate(
                 inputs,
-                max_length=150,
-                min_length=40,
+                max_length=request.max_length,
+                min_length=request.min_length,
                 length_penalty=2.0,
                 num_beams=4,
                 early_stopping=True
             )
 
-        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        return TextResponse(
-            input=input_text,
-            generated_text=generated_text
-        )
+        return SummarizeResponse(summary=summary)
 
     except Exception as e:
-        logger.error(f"Generation error: {e}")
+        logger.error(f"Summarization error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# Mount static files if you have any
+app.mount("/static", StaticFiles(directory="templates"), name="static")
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=7860)
