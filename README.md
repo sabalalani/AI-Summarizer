@@ -2,8 +2,6 @@
 
 A powerful, open-source AI text summarization tool that condenses long articles, documents, and text into concise summaries using state-of-the-art transformer models.
 
-**Live Demo:** 🔗 [Try the AI Summarizer here](https://huggingface.co/spaces/sabalalani/AI-Summarizer)
-
 ![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
 ![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black)
 ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
@@ -19,7 +17,7 @@ A powerful, open-source AI text summarization tool that condenses long articles,
 
 ## 🚀 Live Demo
 
-Check out the live application: [Your Hugging Face Space Link]
+**Live Demo:** 🔗 [Try the AI Summarizer here](https://huggingface.co/spaces/sabalalani/AI-Summarizer)
 
 ## 🛠️ Technology Stack
 
