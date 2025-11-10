@@ -1,24 +1,16 @@
-# app.py - Flask Backend
+# app.py
+
 from flask import Flask, request, jsonify, render_template
 from transformers import BartForConditionalGeneration, BartTokenizer, T5ForConditionalGeneration, T5Tokenizer
 import torch
-from flask_cors import CORS  # Needed for allowing frontend to talk to backend
+from flask_cors import CORS
 
-app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
-
-# --- Load the Summarization Model ---
-# Using a distilled BART model for faster inference
-MODEL_NAME = "sshleifer/distilbart-cnn-12-6"
-tokenizer = BartTokenizer.from_pretrained(MODEL_NAME)
-model = BartForConditionalGeneration.from_pretrained(MODEL_NAME)
-# Note: You can load the model on a GPU if available, e.g., device = 'cuda' or 'cpu'
+app = Flask(__name__, template_folder='.')
+CORS(app)
+# Explicitly setting to 'cpu' to avoid VRAM issues with large models (now removed)
 device = 'cpu'
-model.to(device)
 
-# --- Define and Pre-load Available Models ---
-# Key: The user-friendly name displayed on the frontend
-# Value: A dictionary containing the Hugging Face model/tokenizer class and model path
+# --- Define and Pre-load Available Models (BART-Large REMOVED) ---
 AVAILABLE_MODELS = {
     "DistilBART (Fast)": {
         "path": "sshleifer/distilbart-cnn-12-6",
@@ -30,21 +22,10 @@ AVAILABLE_MODELS = {
         "model_class": T5ForConditionalGeneration,
         "tokenizer_class": T5Tokenizer,
     },
-    "BART-Large (High Quality)": {
-        "path": "facebook/bart-large-cnn",
-        "model_class": BartForConditionalGeneration,
-        "tokenizer_class": BartTokenizer,
-    }
+    # BART-Large (High Quality) model removed for stability
 }
 
-# NEW: Route to serve the HTML file when the user visits the root URL
-@app.route('/')
-def serve_frontend():
-    # Assumes index.html is in the same directory as app.py
-    return render_template('index.html')
-
-
-# Dictionary to hold loaded model/tokenizer objects to avoid re-loading on every request
+# Dictionary to hold loaded model/tokenizer objects
 LOADED_PIPELINES = {}
 
 
@@ -54,7 +35,11 @@ def get_summarization_pipeline(model_name):
         return LOADED_PIPELINES[model_name]["model"], LOADED_PIPELINES[model_name]["tokenizer"]
 
     if model_name not in AVAILABLE_MODELS:
-        raise ValueError(f"Model '{model_name}' not recognized.")
+        # Fallback to a default if the removed model is somehow requested
+        if model_name == 'BART-Large (High Quality)':
+            model_name = "DistilBART (Fast)"
+        else:
+            raise ValueError(f"Model '{model_name}' not recognized.")
 
     model_info = AVAILABLE_MODELS[model_name]
 
@@ -73,23 +58,27 @@ def get_summarization_pipeline(model_name):
     return model, tokenizer
 
 
+@app.route('/')
+def serve_frontend():
+    return render_template('index.html')
+
+
 @app.route('/summarize', methods=['POST'])
 def summarize_text():
     data = request.get_json()
     input_text = data.get('text', '')
     min_length = data.get('min_length', 30)
     max_length = data.get('max_length', 150)
-    # *** NEW: Get the selected model name ***
+
+    # Defaulting to the stable DistilBART if an invalid model name comes through
     selected_model_name = data.get('model_name', 'DistilBART (Fast)')
 
     if not input_text:
         return jsonify({"error": "No text provided"}), 400
 
     try:
-        # *** NEW: Get the correct model and tokenizer based on user selection ***
         model, tokenizer = get_summarization_pipeline(selected_model_name)
 
-        # T5 models require a task prefix (important!)
         if "T5" in selected_model_name:
             input_text = "summarize: " + input_text
 
@@ -117,5 +106,4 @@ def summarize_text():
 
 
 if __name__ == '__main__':
-    # Run the Flask app on port 5000
     app.run(debug=True, port=5000)
