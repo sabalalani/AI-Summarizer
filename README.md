@@ -17,7 +17,7 @@ A powerful, open-source AI text summarization tool that condenses long articles,
 
 ## 🚀 Live Demo
 
-**Live Demo:** 🔗 [Try the AI Summarizer here](https://huggingface.co/spaces/sabalalani/AI-Summarizer)
+**Live Demo:** 🔗 [Try the AI Summarizer here](https://huggingface.co/spaces/SabaBashir/Flask-Model-Summarizer)
 
 ## 🛠️ Technology Stack
 
