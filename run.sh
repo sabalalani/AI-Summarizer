@@ -1,1 +1,4 @@
-flask run --host=0.0.0.0 --port=7860
+FLASK_APP=app.py
+FLASK_RUN_HOST=0.0.0.0
+FLASK_RUN_PORT=7860
+flask run
