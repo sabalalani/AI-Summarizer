@@ -3,14 +3,51 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 import logging
 import uvicorn
 import os
 
-# Initialize FastAPI app
-app = FastAPI(title="AI Text Summarizer")
+# Configure logging FIRST
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Global variables for model and tokenizer
+model = None
+tokenizer = None
+
+
+def load_model():
+    """Load the model and tokenizer"""
+    global model, tokenizer
+    try:
+        logger.info("Loading T5 model and tokenizer...")
+        model_name = "t5-small"
+        tokenizer = T5Tokenizer.from_pretrained(model_name)
+        model = T5ForConditionalGeneration.from_pretrained(model_name)
+        logger.info("Model loaded successfully!")
+    except Exception as e:
+        logger.error(f"Error loading model: {e}")
+        raise
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    logger.info("Starting up application...")
+    load_model()
+    yield
+    # Shutdown
+    logger.info("Shutting down application...")
+
+
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="AI Text Summarizer",
+    lifespan=lifespan
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -19,10 +56,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Global variables for model and tokenizer
-model = None
-tokenizer = None
 
 
 class SummarizeRequest(BaseModel):
@@ -34,21 +67,6 @@ class SummarizeRequest(BaseModel):
 
 class SummarizeResponse(BaseModel):
     summary: str
-
-
-@app.on_event("startup")
-async def load_model():
-    """Load model on startup"""
-    global model, tokenizer
-    try:
-        logger.info("Loading T5 model and tokenizer...")
-        model_name = "t5-small"
-        tokenizer = T5Tokenizer.from_pretrained(model_name)
-        model = T5ForConditionalGeneration.from_pretrained(model_name)
-        logger.info("Model loaded successfully!")
-    except Exception as e:
-        logger.error(f"Error loading model: {e}")
-        raise
 
 
 @app.get("/")
